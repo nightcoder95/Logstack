@@ -1,30 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Plus, X, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-
-const ENTRY_TYPES = [
-  { value: 'daily_work', label: 'Daily Work' },
-  { value: 'goal_progress', label: 'Goal Progress' },
-  { value: 'learning', label: 'Learning' },
-  { value: 'win', label: 'Win / Achievement' },
-  { value: 'help_given', label: 'Help Given' },
-  { value: 'feedback_received', label: 'Feedback Received' },
-  { value: 'leave', label: 'Leave' },
-]
-
-interface Todo {
-  text: string
-  done: boolean
-}
+import { ENTRY_TYPES } from '@/lib/constants'
+import type { Todo } from '@/lib/types'
 
 export default function EditLogPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const params = useParams()
   const [loading, setLoading] = useState(false)
@@ -38,8 +25,7 @@ export default function EditLogPage() {
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
 
-  useEffect(() => {
-    const fetchLog = async () => {
+  const fetchLog = useCallback(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
@@ -76,11 +62,13 @@ export default function EditLogPage() {
 
       setFetching(false)
     }
+  }, [params.id, supabase, router])
 
+  useEffect(() => {
     if (params.id) {
       fetchLog()
     }
-  }, [params.id])
+  }, [params.id, fetchLog])
 
   const addTodo = () => {
     if (newTodo.trim() && todos.length < 20) {
@@ -129,7 +117,6 @@ export default function EditLogPage() {
       description: description.trim() || null,
       todos: todos.length > 0 ? JSON.stringify(todos) : null,
       deadline: deadline || null,
-      updated_at: new Date().toISOString(),
     }
 
     const { error } = await supabase
