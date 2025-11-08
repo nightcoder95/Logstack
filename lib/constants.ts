@@ -19,11 +19,11 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
 }
 
 export const TYPE_COLORS: Record<string, string> = {
-  daily_work: 'bg-blue-100 text-blue-800',
-  goal_progress: 'bg-purple-100 text-purple-800',
-  learning: 'bg-green-100 text-green-800',
-  win: 'bg-yellow-100 text-yellow-800',
-  help_given: 'bg-pink-100 text-pink-800',
-  feedback_received: 'bg-indigo-100 text-indigo-800',
-  leave: 'bg-gray-100 text-gray-800',
+  daily_work: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  goal_progress: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  learning: 'bg-green-500/20 text-green-300 border-green-500/30',
+  win: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  help_given: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  feedback_received: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  leave: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
 }

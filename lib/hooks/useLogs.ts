@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Log } from '@/lib/types'
 
@@ -10,6 +11,8 @@ interface UseLogsOptions {
   limit?: number
   offset?: number
   includeDeleted?: boolean
+  sortBy?: 'date' | 'title' | 'created_at' | 'updated_at'
+  sortOrder?: 'asc' | 'desc'
 }
 
 interface UseLogsResult {
@@ -19,6 +22,7 @@ interface UseLogsResult {
 
 export function useLogs(options: UseLogsOptions = {}) {
   const supabase = createClient()
+  const queryClient = useQueryClient()
   const { 
     searchTerm = '', 
     selectedTypes = [], 
@@ -26,11 +30,36 @@ export function useLogs(options: UseLogsOptions = {}) {
     endDate = '',
     limit = 100,
     offset = 0,
-    includeDeleted = false
+    includeDeleted = false,
+    sortBy = 'date',
+    sortOrder = 'desc'
   } = options
 
+  // Set up real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('logs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'logs',
+        },
+        () => {
+          // Invalidate and refetch logs when any change occurs
+          queryClient.invalidateQueries({ queryKey: ['logs'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, queryClient])
+
   return useQuery({
-    queryKey: ['logs', searchTerm, selectedTypes, startDate, endDate, limit, offset, includeDeleted],
+    queryKey: ['logs', searchTerm, selectedTypes, startDate, endDate, limit, offset, includeDeleted, sortBy, sortOrder],
     queryFn: async (): Promise<UseLogsResult> => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return { logs: [], total: 0 }
@@ -62,7 +91,7 @@ export function useLogs(options: UseLogsOptions = {}) {
       }
 
       query = query
-        .order('date', { ascending: false })
+        .order(sortBy, { ascending: sortOrder === 'asc' })
         .range(offset, offset + limit - 1)
 
       const { data, error, count } = await query

@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useTheme } from '@/lib/theme-context'
-import { Palette, User, Save } from 'lucide-react'
+import { Palette, User, Save, Tag, Plus, X } from 'lucide-react'
+import { ENTRY_TYPES } from '@/lib/constants'
 
 const ACCENT_COLORS = [
   { name: 'Red', value: 'red', color: 'hsl(0, 84.2%, 60.2%)' },
@@ -31,6 +32,18 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Entry types management
+  const [customEntryTypes, setCustomEntryTypes] = useState<Array<{ value: string; label: string }>>(
+    () => {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('custom-entry-types')
+        return stored ? JSON.parse(stored) : []
+      }
+      return []
+    }
+  )
+  const [newEntryLabel, setNewEntryLabel] = useState('')
 
   const { data: user } = useQuery({
     queryKey: ['user'],
@@ -142,6 +155,108 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              <CardTitle>Entry Types</CardTitle>
+            </div>
+            <CardDescription>Manage your custom log entry types</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label className="mb-2 block">Default Entry Types</Label>
+              <div className="flex flex-wrap gap-2">
+                {ENTRY_TYPES.map((type) => (
+                  <div
+                    key={type.value}
+                    className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium"
+                  >
+                    {type.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-2 block">Custom Entry Types</Label>
+              {customEntryTypes.length > 0 ? (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {customEntryTypes.map((type, index) => (
+                    <div
+                      key={type.value}
+                      className="px-3 py-1.5 rounded-lg bg-accent/20 text-sm font-medium flex items-center gap-2"
+                    >
+                      {type.label}
+                      <button
+                        onClick={() => {
+                          const updated = customEntryTypes.filter((_, i) => i !== index)
+                          setCustomEntryTypes(updated)
+                          localStorage.setItem('custom-entry-types', JSON.stringify(updated))
+                          toast.success('Entry type removed')
+                        }}
+                        className="hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-3">No custom entry types yet</p>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter new entry type name"
+                  value={newEntryLabel}
+                  onChange={(e) => setNewEntryLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (newEntryLabel.trim()) {
+                        const value = newEntryLabel.toLowerCase().replace(/\s+/g, '_')
+                        const newType = { value, label: newEntryLabel.trim() }
+                        const updated = [...customEntryTypes, newType]
+                        setCustomEntryTypes(updated)
+                        localStorage.setItem('custom-entry-types', JSON.stringify(updated))
+                        setNewEntryLabel('')
+                        toast.success('Entry type added')
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    if (newEntryLabel.trim()) {
+                      const value = newEntryLabel.toLowerCase().replace(/\s+/g, '_')
+                      const newType = { value, label: newEntryLabel.trim() }
+                      const updated = [...customEntryTypes, newType]
+                      setCustomEntryTypes(updated)
+                      localStorage.setItem('custom-entry-types', JSON.stringify(updated))
+                      setNewEntryLabel('')
+                      toast.success('Entry type added')
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Custom entry types are stored locally and will appear in the dropdown when creating logs
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
               <User className="h-5 w-5" />
               <CardTitle>Profile</CardTitle>
             </div>
@@ -168,7 +283,7 @@ export default function SettingsPage() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.4 }}
       >
         <Card>
           <CardHeader>

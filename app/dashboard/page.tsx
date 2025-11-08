@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
 import { format, subDays, differenceInHours } from 'date-fns'
 import { Calendar, TrendingUp, Target, Plus } from 'lucide-react'
@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { ENTRY_TYPE_LABELS } from '@/lib/constants'
 import type { Log } from '@/lib/types'
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,31 @@ const COLORS = ['hsl(var(--accent))', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'
 
 export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), [])
+  const queryClient = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
+
+  // Set up real-time subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('dashboard-logs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'logs',
+        },
+        () => {
+          // Invalidate and refetch logs when any change occurs
+          queryClient.invalidateQueries({ queryKey: ['logs'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, queryClient])
 
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['logs'],
