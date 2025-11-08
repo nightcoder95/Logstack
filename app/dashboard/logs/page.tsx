@@ -3,21 +3,35 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search, Download, Pencil, Trash2, Calendar } from 'lucide-react'
+import { Plus, Search, Download, Pencil, Trash2, Calendar, Filter } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { ENTRY_TYPES, TYPE_COLORS } from '@/lib/constants'
 import { useLogs } from '@/lib/hooks/useLogs'
+import { motion } from 'framer-motion'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function LogsPage() {
   const supabase = useMemo(() => createClient(), [])
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const { data, isLoading, refetch } = useLogs({
+  const { data, isLoading } = useLogs({
     searchTerm,
     selectedTypes,
     startDate,
@@ -36,9 +50,10 @@ export default function LogsPage() {
     if (error) {
       toast.error('Failed to delete log')
     } else {
-      toast.success('Log deleted')
+      toast.success('Log deleted successfully')
       setDeleteId(null)
-      refetch()
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['logs'] })
     }
   }
 
