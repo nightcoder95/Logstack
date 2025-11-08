@@ -6,21 +6,14 @@ import { format, subDays, parseISO, differenceInHours } from 'date-fns'
 import { Calendar, TrendingUp, Target, Clock, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ENTRY_TYPE_LABELS } from '@/lib/constants'
+import type { Log } from '@/lib/types'
+import { useMemo } from 'react'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316']
 
-const ENTRY_TYPE_LABELS: Record<string, string> = {
-  daily_work: 'Daily Work',
-  goal_progress: 'Goal Progress',
-  learning: 'Learning',
-  win: 'Win',
-  help_given: 'Help Given',
-  feedback_received: 'Feedback Received',
-  leave: 'Leave',
-}
-
 export default function DashboardPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const { data: logs = [], isLoading } = useQuery({
@@ -33,19 +26,22 @@ export default function DashboardPage() {
         .from('logs')
         .select('*')
         .eq('user_id', user.id)
+        .is('deleted_at', null)
         .order('date', { ascending: false })
+        .limit(100)
 
       if (error) throw error
-      return data || []
+      return (data || []) as Log[]
     },
+    staleTime: 60 * 1000,
   })
 
   // Check if logged today
-  const hasLoggedToday = logs.some((log: any) => log.date === today)
+  const hasLoggedToday = logs.some((log) => log.date === today)
 
   // Calculate streak
   const calculateStreak = () => {
-    const uniqueDates = [...new Set(logs.map((log: any) => log.date))].sort().reverse()
+    const uniqueDates = Array.from(new Set(logs.map((log) => log.date))).sort().reverse()
     let streak = 0
     const today = new Date()
     
@@ -64,7 +60,7 @@ export default function DashboardPage() {
   const streak = calculateStreak()
 
   // Upcoming deadlines (within 48 hours)
-  const upcomingDeadlines = logs.filter((log: any) => {
+  const upcomingDeadlines = logs.filter((log) => {
     if (!log.deadline) return false
     const deadlineDate = new Date(log.deadline)
     const hoursUntil = differenceInHours(deadlineDate, new Date())
@@ -74,7 +70,7 @@ export default function DashboardPage() {
   // Chart data: entries per day (last 7 days)
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')
-    const count = logs.filter((log: any) => log.date === date).length
+    const count = logs.filter((log) => log.date === date).length
     return {
       date: format(parseISO(date), 'MMM dd'),
       count,
@@ -83,7 +79,7 @@ export default function DashboardPage() {
 
   // Distribution by type
   const typeDistribution = Object.keys(ENTRY_TYPE_LABELS).map((type) => {
-    const count = logs.filter((log: any) => log.entry_type === type).length
+    const count = logs.filter((log) => log.entry_type === type).length
     return {
       name: ENTRY_TYPE_LABELS[type],
       value: count,
@@ -149,7 +145,7 @@ export default function DashboardPage() {
                   Upcoming deadlines (within 48 hours)
                 </p>
                 <ul className="mt-2 space-y-1">
-                  {upcomingDeadlines.map((log: any) => (
+                  {upcomingDeadlines.map((log) => (
                     <li key={log.id} className="text-sm text-red-700">
                       <Link
                         href={`/dashboard/logs/${log.id}/edit`}
@@ -158,7 +154,7 @@ export default function DashboardPage() {
                         {log.title}
                       </Link>
                       {' - '}
-                      {format(new Date(log.deadline), 'MMM dd, yyyy h:mm a')}
+                      {log.deadline && format(new Date(log.deadline), 'MMM dd, yyyy h:mm a')}
                     </li>
                   ))}
                 </ul>

@@ -1,79 +1,37 @@
 'use client'
 
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
 import { Plus, Search, Download, Pencil, Trash2, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-
-const ENTRY_TYPES = [
-  { value: 'daily_work', label: 'Daily Work' },
-  { value: 'goal_progress', label: 'Goal Progress' },
-  { value: 'learning', label: 'Learning' },
-  { value: 'win', label: 'Win' },
-  { value: 'help_given', label: 'Help Given' },
-  { value: 'feedback_received', label: 'Feedback Received' },
-  { value: 'leave', label: 'Leave' },
-]
-
-const TYPE_COLORS: Record<string, string> = {
-  daily_work: 'bg-blue-100 text-blue-800',
-  goal_progress: 'bg-purple-100 text-purple-800',
-  learning: 'bg-green-100 text-green-800',
-  win: 'bg-yellow-100 text-yellow-800',
-  help_given: 'bg-pink-100 text-pink-800',
-  feedback_received: 'bg-indigo-100 text-indigo-800',
-  leave: 'bg-gray-100 text-gray-800',
-}
+import { ENTRY_TYPES, TYPE_COLORS } from '@/lib/constants'
+import { useLogs } from '@/lib/hooks/useLogs'
 
 export default function LogsPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const { data: logs = [], isLoading, refetch } = useQuery({
-    queryKey: ['logs', searchTerm, selectedTypes, startDate, endDate],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return []
-
-      let query = supabase
-        .from('logs')
-        .select('*')
-        .eq('user_id', user.id)
-
-      if (searchTerm) {
-        query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
-      }
-
-      if (selectedTypes.length > 0) {
-        query = query.in('entry_type', selectedTypes)
-      }
-
-      if (startDate) {
-        query = query.gte('date', startDate)
-      }
-
-      if (endDate) {
-        query = query.lte('date', endDate)
-      }
-
-      query = query.order('date', { ascending: false })
-
-      const { data, error } = await query
-
-      if (error) throw error
-      return data || []
-    },
+  const { data, isLoading, refetch } = useLogs({
+    searchTerm,
+    selectedTypes,
+    startDate,
+    endDate,
+    limit: 100,
   })
 
+  const logs = data?.logs || []
+
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from('logs').delete().eq('id', id)
+    const { error } = await supabase
+      .from('logs')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
 
     if (error) {
       toast.error('Failed to delete log')
@@ -84,13 +42,13 @@ export default function LogsPage() {
     }
   }
 
-  const handleExport = (format: 'csv' | 'json') => {
+  const handleExport = (exportFormat: 'csv' | 'json') => {
     if (logs.length === 0) {
       toast.error('No logs to export')
       return
     }
 
-    if (format === 'csv') {
+    if (exportFormat === 'csv') {
       const headers = ['id', 'date', 'entry_type', 'title', 'todos', 'description', 'deadline', 'created_at', 'updated_at']
       const csvContent = [
         headers.join(','),
@@ -118,7 +76,7 @@ export default function LogsPage() {
       a.click()
       URL.revokeObjectURL(url)
       toast.success('CSV exported successfully')
-    } else if (format === 'json') {
+    } else if (exportFormat === 'json') {
       const jsonContent = JSON.stringify(logs, null, 2)
       const blob = new Blob([jsonContent], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -253,7 +211,7 @@ export default function LogsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {logs.map((log: any) => {
+                {logs.map((log) => {
                   const typeLabel = ENTRY_TYPES.find((t) => t.value === log.entry_type)?.label || log.entry_type
                   const todosCount = log.todos ? JSON.parse(log.todos).length : 0
 
@@ -316,7 +274,7 @@ export default function LogsPage() {
                   </h3>
                   <div className="mt-2">
                     <p className="text-sm text-gray-500">
-                      Are you sure you want to delete this log? This action cannot be undone.
+                      Are you sure you want to delete this log? You can restore it later if needed.
                     </p>
                   </div>
                 </div>

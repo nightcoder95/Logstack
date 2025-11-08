@@ -37,7 +37,9 @@ A personal daily work log web application built with Next.js and Supabase.
 2. Go to the SQL Editor in your Supabase dashboard
 3. Copy and paste the contents of `supabase/migrations/001_initial_schema.sql`
 4. Run the SQL script to create the database schema
-5. Go to Settings → API to find your project credentials:
+5. Copy and paste the contents of `supabase/migrations/002_add_soft_delete.sql`
+6. Run the second SQL script to add soft delete functionality
+7. Go to Settings → API to find your project credentials:
    - `Project URL` (your Supabase URL)
    - `anon public` key (your Supabase Anon Key)
 
@@ -52,6 +54,7 @@ A personal daily work log web application built with Next.js and Supabase.
 
 1. Clone this repository
 2. Install dependencies:
+
    ```bash
    npm install
    # or
@@ -59,12 +62,14 @@ A personal daily work log web application built with Next.js and Supabase.
    ```
 
 3. Create a `.env.local` file in the root directory:
+
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```
 
 4. Run the development server:
+
    ```bash
    npm run dev
    # or
@@ -89,11 +94,13 @@ A personal daily work log web application built with Next.js and Supabase.
 #### Option B: Deploy via Vercel CLI
 
 1. Install Vercel CLI:
+
    ```bash
    npm i -g vercel
    ```
 
 2. Deploy:
+
    ```bash
    vercel
    ```
@@ -141,24 +148,34 @@ A personal daily work log web application built with Next.js and Supabase.
 
 ### `logs` table
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| user_id | uuid | References auth.users |
-| date | date | Date of the log entry |
-| entry_type | text | Type of entry (daily_work, goal_progress, etc.) |
-| title | text | Log title (max 200 chars) |
-| todos | jsonb | Array of todo items |
-| description | text | Markdown description |
-| deadline | timestamptz | Optional deadline |
-| created_at | timestamptz | Creation timestamp |
-| updated_at | timestamptz | Last update timestamp |
+| Column      | Type        | Description                                     |
+| ----------- | ----------- | ----------------------------------------------- |
+| id          | uuid        | Primary key                                     |
+| user_id     | uuid        | References auth.users                           |
+| date        | date        | Date of the log entry                           |
+| entry_type  | text        | Type of entry (daily_work, goal_progress, etc.) |
+| title       | text        | Log title (max 200 chars)                       |
+| todos       | jsonb       | Array of todo items                             |
+| description | text        | Markdown description                            |
+| deadline    | timestamptz | Optional deadline                               |
+| deleted_at  | timestamptz | Soft delete timestamp (null if not deleted)     |
+| created_at  | timestamptz | Creation timestamp                              |
+| updated_at  | timestamptz | Last update timestamp                           |
 
 ## Key Features Explained
 
+### Soft Delete
+
+Logs are soft-deleted (marked with `deleted_at` timestamp) instead of permanently removed. This allows for:
+- Data recovery if needed
+- Audit trail maintenance
+- Protection against accidental deletion
+
+See `SOFT_DELETE_IMPLEMENTATION.md` for technical details.
+
 ### Row Level Security (RLS)
 
-All database queries are protected by Supabase RLS policies. Users can only access their own logs, enforced at the database level.
+All database queries are protected by Supabase RLS policies. Users can only access their own non-deleted logs, enforced at the database level.
 
 ### Streak Calculation
 
@@ -177,10 +194,10 @@ The streak counter tracks consecutive days with at least one log entry, starting
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| NEXT_PUBLIC_SUPABASE_URL | Your Supabase project URL | Yes |
-| NEXT_PUBLIC_SUPABASE_ANON_KEY | Your Supabase anonymous key | Yes |
+| Variable                      | Description                 | Required |
+| ----------------------------- | --------------------------- | -------- |
+| NEXT_PUBLIC_SUPABASE_URL      | Your Supabase project URL   | Yes      |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Your Supabase anonymous key | Yes      |
 
 ## Troubleshooting
 
@@ -215,6 +232,7 @@ The streak counter tracks consecutive days with at least one log entry, starting
 ## Support
 
 For issues or questions:
+
 1. Check the [Next.js documentation](https://nextjs.org/docs)
 2. Review [Supabase documentation](https://supabase.com/docs)
 3. Open an issue in this repository

@@ -1,30 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Plus, X, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-
-const ENTRY_TYPES = [
-  { value: 'daily_work', label: 'Daily Work' },
-  { value: 'goal_progress', label: 'Goal Progress' },
-  { value: 'learning', label: 'Learning' },
-  { value: 'win', label: 'Win / Achievement' },
-  { value: 'help_given', label: 'Help Given' },
-  { value: 'feedback_received', label: 'Feedback Received' },
-  { value: 'leave', label: 'Leave' },
-]
-
-interface Todo {
-  text: string
-  done: boolean
-}
+import { ENTRY_TYPES } from '@/lib/constants'
+import type { Todo } from '@/lib/types'
 
 export default function NewLogPage() {
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const [loading, setLoading] = useState(false)
 
@@ -86,7 +73,7 @@ export default function NewLogPage() {
       deadline: deadline || null,
     }
 
-    const { error } = await supabase.from('logs').insert([logData])
+    const { error } = await supabase.from('logs').insert(logData)
 
     if (error) {
       toast.error('Failed to create log')

@@ -6,11 +6,17 @@ import { createClient } from '@/lib/supabase/client'
 import { LogOut, LayoutDashboard, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import type { User } from '@supabase/supabase-js'
+import { useMemo } from 'react'
+
+const NAV_ITEMS = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Logs', href: '/dashboard/logs', icon: FileText },
+] as const
 
 export function DashboardNav({ user }: { user: User }) {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -19,11 +25,6 @@ export function DashboardNav({ user }: { user: User }) {
     router.refresh()
   }
 
-  const navItems = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Logs', href: '/dashboard/logs', icon: FileText },
-  ]
-
   return (
     <nav className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -31,11 +32,11 @@ export function DashboardNav({ user }: { user: User }) {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/dashboard" className="text-xl font-bold text-primary-600">
-                Daily Work Log
+                LogStack
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-              {navItems.map((item) => {
+              {NAV_ITEMS.map((item) => {
                 const Icon = item.icon
                 const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                 return (
