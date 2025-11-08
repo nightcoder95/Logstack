@@ -42,7 +42,7 @@ export default function NewLogPage() {
           const customTypes = JSON.parse(stored)
           setAllEntryTypes([...ENTRY_TYPES, ...customTypes])
         } catch (e) {
-          console.error('Failed to load custom entry types', e)
+          // Failed to load custom entry types
         }
       }
     }
@@ -102,7 +102,6 @@ export default function NewLogPage() {
 
     if (error) {
       toast.error('Failed to create log')
-      console.error(error)
       setLoading(false)
     } else {
       toast.success('Log created successfully')

@@ -44,7 +44,7 @@ export default function EditLogPage() {
           const customTypes = JSON.parse(stored)
           setAllEntryTypes([...ENTRY_TYPES, ...customTypes])
         } catch (e) {
-          console.error('Failed to load custom entry types', e)
+          // Failed to load custom entry types
         }
       }
     }
@@ -151,7 +151,6 @@ export default function EditLogPage() {
 
     if (error) {
       toast.error('Failed to update log')
-      console.error(error)
       setLoading(false)
     } else {
       toast.success('Log updated successfully')
