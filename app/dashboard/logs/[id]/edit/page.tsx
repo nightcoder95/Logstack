@@ -88,7 +88,6 @@ export default function EditLogPage() {
     setFetching(false)
   }, [params.id, supabase, router])
 
->>>>>>> feature/codebase-fixes
   useEffect(() => {
     if (params.id) {
       fetchLog()
