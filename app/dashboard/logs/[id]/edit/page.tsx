@@ -9,11 +9,17 @@ import { Plus, X, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { ENTRY_TYPES } from '@/lib/constants'
 import type { Todo } from '@/lib/types'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function EditLogPage() {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const params = useParams()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
 
@@ -24,46 +30,65 @@ export default function EditLogPage() {
   const [newTodo, setNewTodo] = useState('')
   const [description, setDescription] = useState('')
   const [deadline, setDeadline] = useState('')
-
-  const fetchLog = useCallback(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('logs')
-        .select('*')
-        .eq('id', params.id)
-        .eq('user_id', user.id)
-        .single()
-
-      if (error || !data) {
-        toast.error('Log not found')
-        router.push('/dashboard/logs')
-        return
-      }
-
-      setDate(data.date)
-      setEntryType(data.entry_type)
-      setTitle(data.title)
-      setDescription(data.description || '')
-      setDeadline(data.deadline ? format(new Date(data.deadline), "yyyy-MM-dd'T'HH:mm") : '')
-      
-      if (data.todos) {
+  
+  // Load custom entry types from localStorage
+  const [allEntryTypes, setAllEntryTypes] = useState<Array<{ value: string; label: string }>>(
+    [...ENTRY_TYPES]
+  )
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('custom-entry-types')
+      if (stored) {
         try {
-          const parsedTodos = typeof data.todos === 'string' ? JSON.parse(data.todos) : data.todos
-          setTodos(parsedTodos)
+          const customTypes = JSON.parse(stored)
+          setAllEntryTypes([...ENTRY_TYPES, ...customTypes])
         } catch (e) {
-          setTodos([])
+          // Failed to load custom entry types
         }
       }
-
-      setFetching(false)
     }
+  }, [])
+
+  const fetchLog = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('logs')
+      .select('*')
+      .eq('id', params.id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (error || !data) {
+      toast.error('Log not found')
+      router.push('/dashboard/logs')
+      return
+    }
+
+    setDate(data.date)
+    setEntryType(data.entry_type)
+    setTitle(data.title)
+    setDescription(data.description || '')
+    setDeadline(data.deadline ? format(new Date(data.deadline), "yyyy-MM-dd'T'HH:mm") : '')
+    
+    if (data.todos) {
+      try {
+        const parsedTodos = typeof data.todos === 'string' ? JSON.parse(data.todos) : data.todos
+        setTodos(parsedTodos)
+      } catch (e) {
+        setTodos([])
+      }
+    }
+
+    setFetching(false)
   }, [params.id, supabase, router])
 
+>>>>>>> feature/codebase-fixes
   useEffect(() => {
     if (params.id) {
       fetchLog()
@@ -127,19 +152,19 @@ export default function EditLogPage() {
 
     if (error) {
       toast.error('Failed to update log')
-      console.error(error)
       setLoading(false)
     } else {
       toast.success('Log updated successfully')
+      // Invalidate React Query cache to refresh the logs list
+      queryClient.invalidateQueries({ queryKey: ['logs'] })
       router.push('/dashboard/logs')
-      router.refresh()
     }
   }
 
   if (fetching) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg text-gray-600">Loading...</div>
+        <div className="text-lg text-muted-foreground">Loading...</div>
       </div>
     )
   }
@@ -147,163 +172,155 @@ export default function EditLogPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="mb-6">
-        <Link
-          href="/dashboard/logs"
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back to Logs
-        </Link>
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/logs">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Logs
+          </Link>
+        </Button>
       </div>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-gray-900">Edit Log</h1>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Edit Log</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                  type="date"
+                  id="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  required
+                />
+              </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
-                Date *
-              </label>
-              <input
-                type="date"
-                id="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+              <div className="space-y-2">
+                <Label htmlFor="entry_type">Entry Type *</Label>
+                <select
+                  id="entry_type"
+                  value={entryType}
+                  onChange={(e) => setEntryType(e.target.value)}
+                  required
+                  className="w-full rounded-lg border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {allEntryTypes.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title">
+                Title * <span className="text-xs text-muted-foreground">(max 200 characters)</span>
+              </Label>
+              <Input
+                type="text"
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                maxLength={200}
+                placeholder="e.g., Fixed JSON bug in API"
               />
             </div>
 
-            <div>
-              <label htmlFor="entry_type" className="block text-sm font-medium text-gray-700 mb-1">
-                Entry Type *
-              </label>
-              <select
-                id="entry_type"
-                value={entryType}
-                onChange={(e) => setEntryType(e.target.value)}
-                required
-                className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              >
-                {ENTRY_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Title * <span className="text-xs text-gray-500">(max 200 characters)</span>
-            </label>
-            <input
-              type="text"
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              maxLength={200}
-              placeholder="e.g., Fixed JSON bug in API"
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Work TODOs <span className="text-xs text-gray-500">(max 20 items)</span>
-            </label>
             <div className="space-y-2">
-              {todos.map((todo, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={todo.done}
-                    onChange={() => toggleTodo(index)}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <span className={`flex-1 ${todo.done ? 'line-through text-gray-500' : ''}`}>
-                    {todo.text}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeTodo(index)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              {todos.length < 20 && (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newTodo}
-                    onChange={(e) => setNewTodo(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTodo())}
-                    placeholder="Add a short action item and press Enter"
-                    className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={addTodo}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
+              <Label>
+                Work TODOs <span className="text-xs text-muted-foreground">(max 20 items)</span>
+              </Label>
+              <div className="space-y-2">
+                {todos.map((todo, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={todo.done}
+                      onChange={() => toggleTodo(index)}
+                      className="rounded border-input"
+                    />
+                    <span className={`flex-1 ${todo.done ? 'line-through text-muted-foreground' : ''}`}>
+                      {todo.text}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeTodo(index)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {todos.length < 20 && (
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      value={newTodo}
+                      onChange={(e) => setNewTodo(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          addTodo()
+                        }
+                      }}
+                      placeholder="Add a short action item and press Enter"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={addTodo}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-              Description <span className="text-xs text-gray-500">(Markdown supported)</span>
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={6}
-              placeholder="Write details, accomplishments, blockers... (Markdown supported)"
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">
+                Description <span className="text-xs text-muted-foreground">(Markdown supported)</span>
+              </Label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={6}
+                placeholder="Write details, accomplishments, blockers... (Markdown supported)"
+                className="w-full rounded-lg border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">
-              Deadline (Optional)
-            </label>
-            <input
-              type="datetime-local"
-              id="deadline"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="deadline">Deadline (Optional)</Label>
+              <Input
+                type="datetime-local"
+                id="deadline"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Link
-              href="/dashboard/logs"
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Saving...' : 'Update Log'}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/logs">Cancel</Link>
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Saving...' : 'Update Log'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,10 +1,8 @@
 import './globals.css'
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import { Providers } from './providers'
 import { Toaster } from 'sonner'
-
-const inter = Inter({ subsets: ['latin'] })
+import { ThemeProvider } from '@/lib/theme-context'
 
 export const metadata: Metadata = {
   title: 'Daily Work Log',
@@ -17,12 +15,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Providers>
-          {children}
-          <Toaster position="top-right" />
-        </Providers>
+    <html lang="en" className="dark">
+      <body>
+        <ThemeProvider>
+          <Providers>
+            {children}
+            <Toaster position="top-right" theme="dark" />
+          </Providers>
+        </ThemeProvider>
       </body>
     </html>
   )

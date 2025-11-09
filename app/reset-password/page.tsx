@@ -3,33 +3,43 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { UserPlus } from 'lucide-react'
+import { Lock } from 'lucide-react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export default function SignupPage() {
-  const [email, setEmail] = useState('')
+export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isValid, setIsValid] = useState(false)
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
 
   useEffect(() => {
-    setSupabase(createClient())
-  }, [])
+    const client = createClient()
+    setSupabase(client)
+    
+    // Check if we have a valid session from the reset link
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsValid(true)
+      } else {
+        toast.error('Invalid or expired reset link')
+        router.push('/forgot-password')
+      }
+    })
+  }, [router])
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
-    if (!email || !password || !confirmPassword) {
+    if (!password || !confirmPassword) {
       toast.error('Please fill in all fields')
       setLoading(false)
       return
@@ -53,24 +63,25 @@ export default function SignupPage() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
+    const { error } = await supabase.auth.updateUser({
+      password: password,
     })
 
     if (error) {
       toast.error(error.message)
       setLoading(false)
     } else {
-      toast.success('Account created successfully! Please sign in.')
+      toast.success('Password updated successfully!')
       router.push('/login')
     }
   }
 
-  if (!supabase) {
+  if (!supabase || !isValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-muted-foreground">Verifying reset link...</p>
+        </div>
       </div>
     )
   }
@@ -82,43 +93,27 @@ export default function SignupPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <div className="text-center mb-8">
-          <div className="inline-block p-3 bg-accent rounded-2xl mb-4">
-            <UserPlus className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold">Create your account</h1>
-          <p className="text-muted-foreground mt-2">Start logging your daily work</p>
-        </div>
-
         <Card>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl">Sign up</CardTitle>
-            <CardDescription>Enter your details to create an account</CardDescription>
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5 text-accent" />
+              <CardTitle className="text-2xl font-bold">Set New Password</CardTitle>
+            </div>
+            <CardDescription>
+              Enter your new password below
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSignup} className="space-y-4">
+            <form onSubmit={handleResetPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">New Password</Label>
                 <Input
                   id="password"
                   name="password"
                   type="password"
                   autoComplete="new-password"
                   required
-                  placeholder="Minimum 8 characters"
+                  placeholder="Enter new password (min 8 characters)"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -131,22 +126,15 @@ export default function SignupPage() {
                   type="password"
                   autoComplete="new-password"
                   required
-                  placeholder="Re-enter your password"
+                  placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
               <Button type="submit" disabled={loading} className="w-full">
-                {loading ? 'Creating account...' : 'Create account'}
+                {loading ? 'Updating...' : 'Update Password'}
               </Button>
             </form>
-
-            <div className="mt-6 text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
-              <Link href="/login" className="text-accent hover:text-accent/80 font-medium transition-colors">
-                Sign in
-              </Link>
-            </div>
           </CardContent>
         </Card>
       </motion.div>
