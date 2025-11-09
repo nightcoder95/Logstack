@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -10,12 +10,17 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Mail, ArrowLeft } from 'lucide-react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
-  const supabase = useMemo(() => createClient(), [])
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,6 +28,12 @@ export default function ForgotPasswordPage() {
 
     if (!email) {
       toast.error('Please enter your email address')
+      setLoading(false)
+      return
+    }
+
+    if (!supabase) {
+      toast.error('Authentication not initialized')
       setLoading(false)
       return
     }
@@ -38,6 +49,14 @@ export default function ForgotPasswordPage() {
       setSent(true)
       toast.success('Password reset email sent!')
     }
+  }
+
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
   }
 
   return (

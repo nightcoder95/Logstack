@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -11,14 +11,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { UserPlus } from 'lucide-react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    setSupabase(createClient())
+  }, [])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,6 +47,12 @@ export default function SignupPage() {
       return
     }
 
+    if (!supabase) {
+      toast.error('Authentication not initialized')
+      setLoading(false)
+      return
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -54,6 +65,14 @@ export default function SignupPage() {
       toast.success('Account created successfully! Please sign in.')
       router.push('/login')
     }
+  }
+
+  if (!supabase) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    )
   }
 
   return (

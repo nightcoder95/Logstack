@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -10,18 +10,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Lock } from 'lucide-react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [isValid, setIsValid] = useState(false)
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
+    const client = createClient()
+    setSupabase(client)
+    
     // Check if we have a valid session from the reset link
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    client.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setIsValid(true)
       } else {
@@ -29,7 +33,7 @@ export default function ResetPasswordPage() {
         router.push('/forgot-password')
       }
     })
-  }, [supabase, router])
+  }, [router])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,6 +57,12 @@ export default function ResetPasswordPage() {
       return
     }
 
+    if (!supabase) {
+      toast.error('Authentication not initialized')
+      setLoading(false)
+      return
+    }
+
     const { error } = await supabase.auth.updateUser({
       password: password,
     })
@@ -66,7 +76,7 @@ export default function ResetPasswordPage() {
     }
   }
 
-  if (!isValid) {
+  if (!supabase || !isValid) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
