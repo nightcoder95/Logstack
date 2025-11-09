@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { useProfile } from '@/lib/hooks/useProfile'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -26,6 +27,7 @@ export function DashboardNav({ user }: { user: SupabaseUser }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const { profile } = useProfile()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -80,7 +82,7 @@ export function DashboardNav({ user }: { user: SupabaseUser }) {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-muted-foreground hidden md:block">
-              {user.email}
+              {profile?.full_name || profile?.email || user.email}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -90,8 +92,8 @@ export function DashboardNav({ user }: { user: SupabaseUser }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
-                  <p className="text-sm font-medium">{user.email}</p>
-                  <p className="text-xs text-muted-foreground">Manage your account</p>
+                  <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground">{profile?.email || user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

@@ -75,7 +75,7 @@ export default function LoginPage() {
             <LogIn className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">Welcome back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to your Daily Work Log</p>
+          <p className="text-muted-foreground mt-2">Sign in to LogStack</p>
         </div>
 
         <Card>

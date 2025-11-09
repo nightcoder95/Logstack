@@ -5,7 +5,7 @@ import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/lib/theme-context'
 
 export const metadata: Metadata = {
-  title: 'Daily Work Log',
+  title: 'LogStack',
   description: 'Personal daily work log application',
 }
 

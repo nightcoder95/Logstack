@@ -3,9 +3,19 @@ export interface Todo {
   done: boolean
 }
 
+export interface Profile {
+  id: string
+  email: string
+  full_name: string | null
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Log {
   id: string
   user_id: string
+  user_email?: string | null
   date: string
   entry_type: string
   title: string

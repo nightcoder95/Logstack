@@ -31,18 +31,23 @@ export default function LogsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'date' | 'title' | 'created_at' | 'updated_at'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   const { data, isLoading } = useLogs({
     searchTerm,
     selectedTypes,
     startDate,
     endDate,
-    limit: 100,
+    limit: itemsPerPage,
+    offset: (currentPage - 1) * itemsPerPage,
     sortBy,
     sortOrder,
   })
 
   const logs = data?.logs || []
+  const totalLogs = data?.total || 0
+  const totalPages = Math.ceil(totalLogs / itemsPerPage)
 
   const handleDelete = async (id: string) => {
     const { error } = await supabase.rpc('soft_delete_log', { log_id: id })
@@ -127,8 +132,21 @@ export default function LogsPage() {
     setEndDate('')
     setSortBy('date')
     setSortOrder('desc')
+    setCurrentPage(1)
     toast.success('Filters cleared')
   }
+
+  // Reset to page 1 when filters change
+  const resetPage = () => {
+    if (currentPage !== 1) {
+      setCurrentPage(1)
+    }
+  }
+
+  // Reset page when filters change
+  useMemo(() => {
+    resetPage()
+  }, [searchTerm, selectedTypes, startDate, endDate, sortBy, sortOrder])
 
   const hasActiveFilters = searchTerm || selectedTypes.length > 0 || startDate || endDate || sortBy !== 'date' || sortOrder !== 'desc'
 
@@ -335,9 +353,14 @@ export default function LogsPage() {
                   return (
                     <tr key={log.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center">
-                          <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                          {format(parseISO(log.date), 'MMM dd, yyyy')}
+                        <div className="flex flex-col">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
+                            {format(parseISO(log.date), 'MMM dd, yyyy')}
+                          </div>
+                          <div className="text-xs text-muted-foreground ml-6">
+                            {format(parseISO(log.date), 'EEEE')}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -373,6 +396,89 @@ export default function LogsPage() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!isLoading && logs.length > 0 && (
+          <div className="border-t border-border px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalLogs)} of {totalLogs} logs
+              </div>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value))
+                  setCurrentPage(1)
+                }}
+                className="h-9 rounded-lg border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <option value={10}>10 per page</option>
+                <option value={25}>25 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+              >
+                First
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="w-9"
+                    >
+                      {pageNum}
+                    </Button>
+                  )
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                Last
+              </Button>
+            </div>
           </div>
         )}
       </Card>

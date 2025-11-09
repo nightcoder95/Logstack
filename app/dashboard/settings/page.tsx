@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useTheme } from '@/lib/theme-context'
+import { useProfile } from '@/lib/hooks/useProfile'
 import { Palette, User, Save, Tag, Plus, X } from 'lucide-react'
 import { ENTRY_TYPES } from '@/lib/constants'
 
@@ -27,11 +28,22 @@ const ACCENT_COLORS = [
 export default function SettingsPage() {
   const supabase = useMemo(() => createClient(), [])
   const { accentColor, setAccentColor } = useTheme()
+  const { profile, updateProfile, isUpdating: isUpdatingProfile } = useProfile()
+  
   const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  
+  // Load profile data
+  useEffect(() => {
+    if (profile) {
+      setEmail(profile.email)
+      setFullName(profile.full_name || '')
+    }
+  }, [profile])
   
   // Entry types management
   const [customEntryTypes, setCustomEntryTypes] = useState<Array<{ value: string; label: string }>>(
@@ -59,6 +71,25 @@ export default function SettingsPage() {
   const handleColorChange = (color: typeof accentColor) => {
     setAccentColor(color)
     toast.success(`Theme color changed to ${color}`)
+  }
+
+  const handleUpdateProfile = () => {
+    if (!fullName.trim()) {
+      toast.error('Full name is required')
+      return
+    }
+
+    updateProfile(
+      { full_name: fullName.trim() },
+      {
+        onSuccess: () => {
+          toast.success('Profile updated successfully')
+        },
+        onError: (error: any) => {
+          toast.error(error.message || 'Failed to update profile')
+        },
+      }
+    )
   }
 
   const handleUpdatePassword = async () => {
@@ -264,6 +295,16 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="full-name">Full Name</Label>
+              <Input
+                id="full-name"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -276,6 +317,14 @@ export default function SettingsPage() {
                 Email cannot be changed at this time
               </p>
             </div>
+            <Button
+              onClick={handleUpdateProfile}
+              disabled={isUpdatingProfile}
+              className="w-full md:w-auto"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              {isUpdatingProfile ? 'Updating...' : 'Update Profile'}
+            </Button>
           </CardContent>
         </Card>
       </motion.div>
