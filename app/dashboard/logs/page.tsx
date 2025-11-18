@@ -814,9 +814,6 @@ export default function LogsPage() {
                               initialTitle={log.title}
                               onSave={handleUpdateTitle}
                             />
-                            {hasDescription && (
-                              <FileText className="h-3.5 w-3.5 text-accent flex-shrink-0" />
-                            )}
                           </div>
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap text-sm text-foreground/80">
