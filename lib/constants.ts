@@ -19,11 +19,21 @@ export const ENTRY_TYPE_LABELS: Record<string, string> = {
 }
 
 export const TYPE_COLORS: Record<string, string> = {
-  daily_work: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  goal_progress: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  learning: 'bg-green-500/20 text-green-300 border-green-500/30',
-  win: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  help_given: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-  feedback_received: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  leave: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
+  daily_work: 'bg-blue-500/30 text-blue-200 border-blue-400/50 hover:bg-blue-500/40',
+  goal_progress: 'bg-purple-500/30 text-purple-200 border-purple-400/50 hover:bg-purple-500/40',
+  learning: 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50 hover:bg-emerald-500/40',
+  win: 'bg-amber-500/30 text-amber-200 border-amber-400/50 hover:bg-amber-500/40',
+  help_given: 'bg-pink-500/30 text-pink-200 border-pink-400/50 hover:bg-pink-500/40',
+  feedback_received: 'bg-indigo-500/30 text-indigo-200 border-indigo-400/50 hover:bg-indigo-500/40',
+  leave: 'bg-slate-500/30 text-slate-200 border-slate-400/50 hover:bg-slate-500/40',
+}
+
+export const TYPE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  daily_work: { bg: 'rgba(59, 130, 246, 0.3)', text: 'rgb(191, 219, 254)', border: 'rgba(96, 165, 250, 0.5)' },
+  goal_progress: { bg: 'rgba(168, 85, 247, 0.3)', text: 'rgb(233, 213, 255)', border: 'rgba(192, 132, 252, 0.5)' },
+  learning: { bg: 'rgba(16, 185, 129, 0.3)', text: 'rgb(167, 243, 208)', border: 'rgba(52, 211, 153, 0.5)' },
+  win: { bg: 'rgba(245, 158, 11, 0.3)', text: 'rgb(253, 230, 138)', border: 'rgba(251, 191, 36, 0.5)' },
+  help_given: { bg: 'rgba(236, 72, 153, 0.3)', text: 'rgb(251, 207, 232)', border: 'rgba(244, 114, 182, 0.5)' },
+  feedback_received: { bg: 'rgba(99, 102, 241, 0.3)', text: 'rgb(199, 210, 254)', border: 'rgba(129, 140, 248, 0.5)' },
+  leave: { bg: 'rgba(100, 116, 139, 0.3)', text: 'rgb(226, 232, 240)', border: 'rgba(148, 163, 184, 0.5)' },
 }

@@ -3,10 +3,10 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { format, parseISO } from 'date-fns'
-import { Plus, Search, Download, Pencil, Trash2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { Plus, Search, Download, Pencil, Trash2, Calendar, ArrowUpDown, ArrowUp, ArrowDown, X, ChevronDown, ChevronRight, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ENTRY_TYPES, TYPE_COLORS } from '@/lib/constants'
+import { ENTRY_TYPES, TYPE_COLORS, TYPE_STYLES } from '@/lib/constants'
 import { useLogs } from '@/lib/hooks/useLogs'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,7 @@ export default function LogsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
   const { data, isLoading } = useLogs({
     searchTerm,
@@ -313,6 +314,7 @@ export default function LogsPage() {
             <table className="min-w-full divide-y divide-border">
               <thead className="bg-muted/50">
                 <tr>
+                  <th className="px-6 py-3 w-10"></th>
                   <th 
                     className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground transition-colors"
                     onClick={() => handleSort('date')}
@@ -349,49 +351,111 @@ export default function LogsPage() {
                 {logs.map((log) => {
                   const typeLabel = ENTRY_TYPES.find((t) => t.value === log.entry_type)?.label || log.entry_type
                   const todosCount = log.todos ? JSON.parse(log.todos).length : 0
+                  const isExpanded = expandedRows.has(log.id)
+                  const hasDescription = log.description && log.description.trim() !== '' && log.description !== '<p></p>'
+
+                  const toggleExpand = () => {
+                    const newExpanded = new Set(expandedRows)
+                    if (isExpanded) {
+                      newExpanded.delete(log.id)
+                    } else {
+                      newExpanded.add(log.id)
+                    }
+                    setExpandedRows(newExpanded)
+                  }
 
                   return (
-                    <tr key={log.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex flex-col">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
-                            {format(parseISO(log.date), 'MMM dd, yyyy')}
+                    <>
+                      <tr key={log.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {hasDescription ? (
+                            <button
+                              onClick={toggleExpand}
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label={isExpanded ? "Hide description" : "Show description"}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </button>
+                          ) : (
+                            <div className="w-4 h-4" />
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex flex-col">
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 text-muted-foreground mr-2" />
+                              {format(parseISO(log.date), 'MMM dd, yyyy')}
+                            </div>
+                            <div className="text-xs text-muted-foreground ml-6">
+                              {format(parseISO(log.date), 'EEEE')}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground ml-6">
-                            {format(parseISO(log.date), 'EEEE')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span 
+                            className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors"
+                            style={{
+                              backgroundColor: TYPE_STYLES[log.entry_type]?.bg || 'rgba(100, 116, 139, 0.3)',
+                              color: TYPE_STYLES[log.entry_type]?.text || 'rgb(226, 232, 240)',
+                              borderColor: TYPE_STYLES[log.entry_type]?.border || 'rgba(148, 163, 184, 0.5)',
+                            }}
+                          >
+                            {typeLabel}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm max-w-xs">
+                          <div className="flex items-center gap-2">
+                            {log.title}
+                            {hasDescription && (
+                              <FileText className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Badge className={TYPE_COLORS[log.entry_type]}>
-                          {typeLabel}
-                        </Badge>
-                      </td>
-                      <td className="px-6 py-4 text-sm max-w-xs truncate">
-                        {log.title}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                        {todosCount > 0 ? `${todosCount} items` : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
-                        {log.deadline ? format(new Date(log.deadline), 'MMM dd, h:mm a') : '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          href={`/dashboard/logs/${log.id}/edit`}
-                          className="text-accent hover:text-accent/80 mr-4"
-                        >
-                          <Pencil className="inline h-4 w-4" />
-                        </Link>
-                        <button
-                          onClick={() => setDeleteId(log.id)}
-                          className="text-destructive hover:text-destructive/80"
-                        >
-                          <Trash2 className="inline h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          {todosCount > 0 ? `${todosCount} items` : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-muted-foreground">
+                          {log.deadline ? format(new Date(log.deadline), 'MMM dd, h:mm a') : '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <Link
+                            href={`/dashboard/logs/${log.id}/edit`}
+                            className="text-accent hover:text-accent/80 mr-4"
+                          >
+                            <Pencil className="inline h-4 w-4" />
+                          </Link>
+                          <button
+                            onClick={() => setDeleteId(log.id)}
+                            className="text-destructive hover:text-destructive/80"
+                          >
+                            <Trash2 className="inline h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && hasDescription && (
+                        <tr key={`${log.id}-description`} className="bg-muted/30">
+                          <td colSpan={7} className="px-6 py-4">
+                            <div className="flex items-start gap-3">
+                              <FileText className="h-4 w-4 text-muted-foreground mt-1 flex-shrink-0" />
+                              <div className="flex-1">
+                                <div className="text-xs font-medium text-muted-foreground mb-2">Description</div>
+                                <div 
+                                  className="text-sm prose prose-sm max-w-none prose-invert"
+                                  style={{
+                                    wordBreak: 'break-word',
+                                  }}
+                                  dangerouslySetInnerHTML={{ __html: log.description || '' }}
+                                />
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   )
                 })}
               </tbody>

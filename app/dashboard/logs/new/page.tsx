@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useQueryClient } from '@tanstack/react-query'
+import { RichTextEditor } from '@/components/RichTextEditor'
 
 export default function NewLogPage() {
   const supabase = useMemo(() => createClient(), [])
@@ -230,15 +231,12 @@ export default function NewLogPage() {
 
             <div className="space-y-2">
               <Label htmlFor="description">
-                Description <span className="text-xs text-muted-foreground">(Markdown supported)</span>
+                Description
               </Label>
-              <textarea
-                id="description"
+              <RichTextEditor
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={6}
-                placeholder="Write details, accomplishments, blockers... (Markdown supported)"
-                className="w-full rounded-lg border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onChange={setDescription}
+                placeholder="Write details, accomplishments, blockers..."
               />
             </div>
 
