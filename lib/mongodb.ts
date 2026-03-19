@@ -2,18 +2,7 @@ import { MongoClient, MongoClientOptions } from 'mongodb'
 
 declare global {
   // eslint-disable-next-line no-var
-  var mongoClient: MongoClient | undefined
-}
-
-const uri = process.env.MONGODB_URI
-const dbName = process.env.MONGODB_DB
-
-if (!uri) {
-  throw new Error('Please add your MONGODB_URI to .env.local')
-}
-
-if (!dbName) {
-  throw new Error('Please add your MONGODB_DB to .env.local')
+  var _mongoClientPromise: Promise<MongoClient> | undefined
 }
 
 const options: MongoClientOptions = {
@@ -21,25 +10,48 @@ const options: MongoClientOptions = {
   minPoolSize: 1,
 }
 
-let client: MongoClient
-let clientPromise: Promise<MongoClient>
-
-if (process.env.NODE_ENV === 'development') {
-  // In development mode, use a global variable so that the value
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  if (!global.mongoClient) {
-    global.mongoClient = new MongoClient(uri, options)
+function getClientPromise(): Promise<MongoClient> {
+  if (process.env.NODE_ENV === 'development') {
+    if (!global._mongoClientPromise) {
+      const uri = process.env.MONGODB_URI
+      if (!uri) {
+        throw new Error('Please add your MONGODB_URI to .env.local')
+      }
+      const client = new MongoClient(uri, options)
+      global._mongoClientPromise = client.connect()
+    }
+    return global._mongoClientPromise
   }
-  client = global.mongoClient
-  clientPromise = client.connect()
-} else {
-  // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri, options)
-  clientPromise = client.connect()
+
+  const uri = process.env.MONGODB_URI
+  if (!uri) {
+    throw new Error('Please add your MONGODB_URI to .env.local')
+  }
+  const client = new MongoClient(uri, options)
+  return client.connect()
 }
+
+// Thenable that defers MongoDB connection until first awaited.
+// This prevents build-time errors when env vars are not available.
+const clientPromise: Promise<MongoClient> = {
+  then(onfulfilled, onrejected) {
+    return getClientPromise().then(onfulfilled, onrejected)
+  },
+  catch(onrejected) {
+    return getClientPromise().catch(onrejected)
+  },
+  finally(onfinally) {
+    return getClientPromise().finally(onfinally)
+  },
+  [Symbol.toStringTag]: 'MongoClientPromise',
+} as Promise<MongoClient>
 
 export async function getDb() {
   const client = await clientPromise
+  const dbName = process.env.MONGODB_DB
+  if (!dbName) {
+    throw new Error('Please add your MONGODB_DB to .env.local')
+  }
   return client.db(dbName)
 }
 
