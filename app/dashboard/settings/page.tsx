@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useQuery } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +12,7 @@ import { useTheme } from '@/lib/theme-context'
 import { useProfile } from '@/lib/hooks/useProfile'
 import { Palette, User, Save, Tag, Plus, X } from 'lucide-react'
 import { ENTRY_TYPES } from '@/lib/constants'
+import type { CustomEntryType } from '@/lib/types'
 
 const ACCENT_COLORS = [
   { name: 'Red', value: 'red', color: 'hsl(0, 84.2%, 60.2%)' },
@@ -26,47 +26,31 @@ const ACCENT_COLORS = [
 ] as const
 
 export default function SettingsPage() {
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const { accentColor, setAccentColor } = useTheme()
   const { profile, updateProfile, isUpdating: isUpdatingProfile } = useProfile()
-  
+
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+
+  // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [isUpdating, setIsUpdating] = useState(false)
-  
-  // Load profile data
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+
+  // New custom entry type input
+  const [newEntryLabel, setNewEntryLabel] = useState('')
+
+  // Load profile data into local state
   useEffect(() => {
     if (profile) {
       setEmail(profile.email)
       setFullName(profile.full_name || '')
+    } else if (session?.user?.email) {
+      setEmail(session.user.email)
     }
-  }, [profile])
-  
-  // Entry types management
-  const [customEntryTypes, setCustomEntryTypes] = useState<Array<{ value: string; label: string }>>(
-    () => {
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('custom-entry-types')
-        return stored ? JSON.parse(stored) : []
-      }
-      return []
-    }
-  )
-  const [newEntryLabel, setNewEntryLabel] = useState('')
-
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setEmail(user.email || '')
-      }
-      return user
-    },
-  })
+  }, [profile, session])
 
   const handleColorChange = (color: typeof accentColor) => {
     setAccentColor(color)
@@ -82,18 +66,14 @@ export default function SettingsPage() {
     updateProfile(
       { full_name: fullName.trim() },
       {
-        onSuccess: () => {
-          toast.success('Profile updated successfully')
-        },
-        onError: (error: any) => {
-          toast.error(error.message || 'Failed to update profile')
-        },
+        onSuccess: () => toast.success('Profile updated successfully'),
+        onError: (error: Error) => toast.error(error.message || 'Failed to update profile'),
       }
     )
   }
 
   const handleUpdatePassword = async () => {
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error('Please fill in all password fields')
       return
     }
@@ -108,37 +88,88 @@ export default function SettingsPage() {
       return
     }
 
-    setIsUpdating(true)
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
+    setIsUpdatingPassword(true)
 
-    if (error) {
-      toast.error(error.message)
-    } else {
-      toast.success('Password updated successfully')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+    try {
+      const response = await fetch('/api/auth/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to update password')
+      } else {
+        toast.success('Password updated successfully')
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      }
+    } catch {
+      toast.error('An unexpected error occurred')
     }
-    setIsUpdating(false)
+
+    setIsUpdatingPassword(false)
   }
+
+  const handleAddEntryType = () => {
+    if (!newEntryLabel.trim()) return
+
+    const value = newEntryLabel
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+      .replace(/[^a-z0-9_]/g, '')
+
+    if (!value) {
+      toast.error('Entry type name must contain at least one alphanumeric character')
+      return
+    }
+
+    const current: CustomEntryType[] = profile?.custom_entry_types ?? []
+
+    if (current.some(t => t.value === value)) {
+      toast.error('An entry type with this name already exists')
+      return
+    }
+
+    if (current.length >= 20) {
+      toast.error('Maximum 20 custom entry types allowed')
+      return
+    }
+
+    updateProfile(
+      { custom_entry_types: [...current, { value, label: newEntryLabel.trim() }] },
+      {
+        onSuccess: () => { setNewEntryLabel(''); toast.success('Entry type added') },
+        onError: (error: Error) => toast.error(error.message || 'Failed to add entry type'),
+      }
+    )
+  }
+
+  const handleRemoveEntryType = (typeValue: string) => {
+    const current: CustomEntryType[] = profile?.custom_entry_types ?? []
+    updateProfile(
+      { custom_entry_types: current.filter(t => t.value !== typeValue) },
+      {
+        onSuccess: () => toast.success('Entry type removed'),
+        onError: (error: Error) => toast.error(error.message || 'Failed to remove entry type'),
+      }
+    )
+  }
+
+  const customEntryTypes: CustomEntryType[] = profile?.custom_entry_types ?? []
 
   return (
     <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground mt-1">Manage your account and preferences</p>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
+      {/* Theme Color */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -178,11 +209,8 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
+      {/* Custom Entry Types — stored in MongoDB via profile API */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -196,10 +224,7 @@ export default function SettingsPage() {
               <Label className="mb-2 block">Default Entry Types</Label>
               <div className="flex flex-wrap gap-2">
                 {ENTRY_TYPES.map((type) => (
-                  <div
-                    key={type.value}
-                    className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium"
-                  >
+                  <div key={type.value} className="px-3 py-1.5 rounded-lg bg-muted text-sm font-medium">
                     {type.label}
                   </div>
                 ))}
@@ -210,20 +235,16 @@ export default function SettingsPage() {
               <Label className="mb-2 block">Custom Entry Types</Label>
               {customEntryTypes.length > 0 ? (
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {customEntryTypes.map((type, index) => (
+                  {customEntryTypes.map((type) => (
                     <div
                       key={type.value}
                       className="px-3 py-1.5 rounded-lg bg-accent/20 text-sm font-medium flex items-center gap-2"
                     >
                       {type.label}
                       <button
-                        onClick={() => {
-                          const updated = customEntryTypes.filter((_, i) => i !== index)
-                          setCustomEntryTypes(updated)
-                          localStorage.setItem('custom-entry-types', JSON.stringify(updated))
-                          toast.success('Entry type removed')
-                        }}
+                        onClick={() => handleRemoveEntryType(type.value)}
                         className="hover:text-destructive"
+                        aria-label={`Remove ${type.label}`}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -240,51 +261,23 @@ export default function SettingsPage() {
                   value={newEntryLabel}
                   onChange={(e) => setNewEntryLabel(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      if (newEntryLabel.trim()) {
-                        const value = newEntryLabel.toLowerCase().replace(/\s+/g, '_')
-                        const newType = { value, label: newEntryLabel.trim() }
-                        const updated = [...customEntryTypes, newType]
-                        setCustomEntryTypes(updated)
-                        localStorage.setItem('custom-entry-types', JSON.stringify(updated))
-                        setNewEntryLabel('')
-                        toast.success('Entry type added')
-                      }
-                    }
+                    if (e.key === 'Enter') { e.preventDefault(); handleAddEntryType() }
                   }}
                 />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    if (newEntryLabel.trim()) {
-                      const value = newEntryLabel.toLowerCase().replace(/\s+/g, '_')
-                      const newType = { value, label: newEntryLabel.trim() }
-                      const updated = [...customEntryTypes, newType]
-                      setCustomEntryTypes(updated)
-                      localStorage.setItem('custom-entry-types', JSON.stringify(updated))
-                      setNewEntryLabel('')
-                      toast.success('Entry type added')
-                    }
-                  }}
-                >
+                <Button variant="outline" size="icon" onClick={handleAddEntryType} disabled={isUpdatingProfile}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Custom entry types are stored locally and will appear in the dropdown when creating logs
+                Custom entry types are saved to your account and synced across devices
               </p>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
+      {/* Profile */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -306,22 +299,10 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                Email cannot be changed at this time
-              </p>
+              <Input id="email" type="email" value={email} disabled className="bg-muted" />
+              <p className="text-xs text-muted-foreground">Email cannot be changed at this time</p>
             </div>
-            <Button
-              onClick={handleUpdateProfile}
-              disabled={isUpdatingProfile}
-              className="w-full md:w-auto"
-            >
+            <Button onClick={handleUpdateProfile} disabled={isUpdatingProfile} className="w-full md:w-auto">
               <Save className="mr-2 h-4 w-4" />
               {isUpdatingProfile ? 'Updating...' : 'Update Profile'}
             </Button>
@@ -329,11 +310,8 @@ export default function SettingsPage() {
         </Card>
       </motion.div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
+      {/* Change Password */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
         <Card>
           <CardHeader>
             <CardTitle>Change Password</CardTitle>
@@ -341,32 +319,41 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter your current password"
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <Input
                 id="new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password (min 8 characters)"
+                placeholder="Minimum 8 characters"
+                autoComplete="new-password"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Label htmlFor="confirm-password">Confirm New Password</Label>
               <Input
                 id="confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
+                placeholder="Re-enter new password"
+                autoComplete="new-password"
               />
             </div>
-            <Button
-              onClick={handleUpdatePassword}
-              disabled={isUpdating}
-              className="w-full md:w-auto"
-            >
+            <Button onClick={handleUpdatePassword} disabled={isUpdatingPassword} className="w-full md:w-auto">
               <Save className="mr-2 h-4 w-4" />
-              {isUpdating ? 'Updating...' : 'Update Password'}
+              {isUpdatingPassword ? 'Updating...' : 'Update Password'}
             </Button>
           </CardContent>
         </Card>

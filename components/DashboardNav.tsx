@@ -2,11 +2,9 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { useSession, signOut } from 'next-auth/react'
 import { LogOut, LayoutDashboard, FileText, Settings, User } from 'lucide-react'
 import { toast } from 'sonner'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
-import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   DropdownMenu,
@@ -23,18 +21,20 @@ const NAV_ITEMS = [
   { name: 'Logs', href: '/dashboard/logs', icon: FileText },
 ] as const
 
-export function DashboardNav({ user }: { user: SupabaseUser }) {
+export function DashboardNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
+  const { data: session } = useSession()
   const { profile } = useProfile()
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await signOut({ redirect: false })
     toast.success('Logged out successfully')
     router.push('/login')
     router.refresh()
   }
+
+  if (!session?.user) return null
 
   return (
     <motion.nav
@@ -82,7 +82,7 @@ export function DashboardNav({ user }: { user: SupabaseUser }) {
           </div>
           <div className="flex items-center space-x-4">
             <span className="text-sm text-muted-foreground hidden md:block">
-              {profile?.full_name || profile?.email || user.email}
+              {profile?.full_name || profile?.email || session.user.email}
             </span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -93,7 +93,7 @@ export function DashboardNav({ user }: { user: SupabaseUser }) {
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-2 py-1.5">
                   <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
-                  <p className="text-xs text-muted-foreground">{profile?.email || user.email}</p>
+                  <p className="text-xs text-muted-foreground">{profile?.email || session.user.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

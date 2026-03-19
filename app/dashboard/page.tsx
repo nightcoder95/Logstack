@@ -1,110 +1,43 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
-import { format, subDays, differenceInHours } from 'date-fns'
+import { useQuery } from '@tanstack/react-query'
+import { useSession } from 'next-auth/react'
 import { Calendar, TrendingUp, Target, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { ENTRY_TYPE_LABELS } from '@/lib/constants'
-import type { Log } from '@/lib/types'
-import { useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { NotificationCard } from '@/components/NotificationCard'
+import type { LogStats } from '@/lib/db/logs'
 
 const COLORS = ['hsl(var(--accent))', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316']
 
 export default function DashboardPage() {
-  const supabase = useMemo(() => createClient(), [])
-  const queryClient = useQueryClient()
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const { data: session } = useSession()
 
-  // Set up real-time subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel('dashboard-logs-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'logs',
-        },
-        () => {
-          // Invalidate and refetch logs when any change occurs
-          queryClient.invalidateQueries({ queryKey: ['logs'] })
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [supabase, queryClient])
-
-  const { data: logs = [], isLoading } = useQuery({
-    queryKey: ['logs'],
+  const { data: stats, isLoading } = useQuery<LogStats>({
+    queryKey: ['stats'],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return []
-
-      const { data, error } = await supabase
-        .from('logs')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .order('date', { ascending: false })
-        .limit(100)
-
-      if (error) throw error
-      return (data || []) as Log[]
+      const response = await fetch('/api/logs/stats')
+      if (!response.ok) throw new Error('Failed to fetch stats')
+      return response.json()
     },
+    enabled: !!session?.user?.id,
     staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
   })
 
-  // Check if logged today
-  const hasLoggedToday = logs.some((log) => log.date === today)
-
-  // Calculate streak
-  const calculateStreak = () => {
-    const uniqueDates = Array.from(new Set(logs.map((log) => log.date))).sort().reverse()
-    let streak = 0
-    const today = new Date()
-    
-    for (let i = 0; i < uniqueDates.length; i++) {
-      const expectedDate = format(subDays(today, i), 'yyyy-MM-dd')
-      if (uniqueDates[i] === expectedDate) {
-        streak++
-      } else {
-        break
-      }
-    }
-    
-    return streak
-  }
-
-  const streak = calculateStreak()
-
-  // Upcoming deadlines (within 48 hours)
-  const upcomingDeadlines = logs.filter((log) => {
-    if (!log.deadline) return false
-    const deadlineDate = new Date(log.deadline)
-    const hoursUntil = differenceInHours(deadlineDate, new Date())
-    return hoursUntil > 0 && hoursUntil <= 48
-  })
-
-  // Distribution by type
-  const typeDistribution = Object.keys(ENTRY_TYPE_LABELS).map((type) => {
-    const count = logs.filter((log) => log.entry_type === type).length
-    return {
-      name: ENTRY_TYPE_LABELS[type],
+  // Derive chart data from aggregated stats (no record limit — always accurate)
+  const typeDistribution = Object.entries(stats?.logsByType ?? {})
+    .map(([type, count]) => ({
+      name: ENTRY_TYPE_LABELS[type] ?? type,
       value: count,
-    }
-  }).filter((item) => item.value > 0)
+    }))
+    .filter(item => item.value > 0)
 
-  // Most used type
   const mostUsedType = typeDistribution.reduce(
     (max, item) => (item.value > max.value ? item : max),
     { name: 'None', value: 0 }
@@ -126,12 +59,7 @@ export default function DashboardPage() {
 
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   }
 
   const itemVariants = {
@@ -140,12 +68,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
+    <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={itemVariants} className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
@@ -167,10 +90,8 @@ export default function DashboardPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{logs.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Entries recorded
-            </p>
+            <div className="text-3xl font-bold">{stats?.totalLogs ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Entries recorded</p>
           </CardContent>
         </Card>
 
@@ -180,10 +101,8 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{streak} days</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Keep it going!
-            </p>
+            <div className="text-3xl font-bold">{stats?.streak ?? 0} days</div>
+            <p className="text-xs text-muted-foreground mt-1">Keep it going!</p>
           </CardContent>
         </Card>
 
@@ -194,9 +113,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold truncate">{mostUsedType.name}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {mostUsedType.value} entries
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">{mostUsedType.value} entries</p>
           </CardContent>
         </Card>
       </motion.div>
@@ -222,7 +139,7 @@ export default function DashboardPage() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {typeDistribution.map((entry, index) => (
+                    {typeDistribution.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
@@ -238,9 +155,9 @@ export default function DashboardPage() {
         </Card>
 
         <NotificationCard
-          hasLoggedToday={hasLoggedToday}
-          upcomingDeadlines={upcomingDeadlines}
-          streak={streak}
+          hasLoggedToday={stats?.hasLoggedToday ?? false}
+          upcomingDeadlines={stats?.upcomingDeadlines ?? []}
+          streak={stats?.streak ?? 0}
         />
       </motion.div>
     </motion.div>

@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
@@ -10,17 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Mail, ArrowLeft } from 'lucide-react'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,31 +25,27 @@ export default function ForgotPasswordPage() {
       return
     }
 
-    if (!supabase) {
-      toast.error('Authentication not initialized')
-      setLoading(false)
-      return
-    }
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
+      const data = await response.json()
 
-    if (error) {
-      toast.error(error.message)
-      setLoading(false)
-    } else {
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to send reset email')
+        setLoading(false)
+        return
+      }
+
       setSent(true)
       toast.success('Password reset email sent!')
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+      setLoading(false)
     }
-  }
-
-  if (!supabase) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    )
   }
 
   return (

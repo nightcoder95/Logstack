@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { signIn } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
@@ -11,18 +11,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { LogIn } from 'lucide-react'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,35 +30,71 @@ export default function LoginPage() {
       return
     }
 
-    if (!supabase) {
-      toast.error('Authentication not initialized')
-      setLoading(false)
-      return
-    }
+    try {
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      toast.error(error.message)
+      if (result?.error) {
+        toast.error(result.error)
+        setLoading(false)
+      } else {
+        toast.success('Logged in successfully')
+        router.push(callbackUrl)
+        router.refresh()
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred')
       setLoading(false)
-    } else {
-      toast.success('Logged in successfully')
-      router.push('/dashboard')
-      router.refresh()
     }
   }
 
-  if (!supabase) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+  return (
+    <form onSubmit={handleLogin} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          placeholder="your@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
       </div>
-    )
-  }
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link
+            href="/forgot-password"
+            className="text-xs text-accent hover:text-accent/80 transition-colors"
+          >
+            Forgot password?
+          </Link>
+        </div>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+      </div>
+      <Button type="submit" disabled={loading} className="w-full">
+        {loading ? 'Signing in...' : 'Sign in'}
+      </Button>
+    </form>
+  )
+}
 
+export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-12">
       <motion.div
@@ -84,45 +116,9 @@ export default function LoginPage() {
             <CardDescription>Enter your credentials to continue</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-accent hover:text-accent/80 transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              <Button type="submit" disabled={loading} className="w-full">
-                {loading ? 'Signing in...' : 'Sign in'}
-              </Button>
-            </form>
+            <Suspense>
+              <LoginForm />
+            </Suspense>
 
             <div className="mt-6 text-center text-sm">
               <span className="text-muted-foreground">Don't have an account? </span>

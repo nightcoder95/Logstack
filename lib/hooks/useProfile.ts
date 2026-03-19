@@ -1,43 +1,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { useSession } from 'next-auth/react'
 import type { Profile } from '@/lib/types'
 
 export function useProfile() {
-  const supabase = createClient()
+  const { data: session } = useSession()
   const queryClient = useQueryClient()
 
   const { data: profile, isLoading, error } = useQuery({
     queryKey: ['profile'],
     queryFn: async (): Promise<Profile | null> => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return null
+      if (!session?.user?.id) return null
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      return data as Profile
+      const response = await fetch('/api/profile')
+      
+      if (!response.ok) {
+        if (response.status === 401) return null
+        throw new Error('Failed to fetch profile')
+      }
+      
+      return response.json()
     },
+    enabled: !!session?.user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
   const updateProfile = useMutation({
     mutationFn: async (updates: Partial<Profile>) => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not authenticated')
+      const response = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single()
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.message || 'Failed to update profile')
+      }
 
-      if (error) throw error
-      return data
+      return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })

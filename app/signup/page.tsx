@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -11,19 +10,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { UserPlus } from 'lucide-react'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
   const router = useRouter()
-
-  useEffect(() => {
-    setSupabase(createClient())
-  }, [])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -47,32 +40,27 @@ export default function SignupPage() {
       return
     }
 
-    if (!supabase) {
-      toast.error('Authentication not initialized')
-      setLoading(false)
-      return
-    }
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+      const data = await response.json()
 
-    if (error) {
-      toast.error(error.message)
-      setLoading(false)
-    } else {
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to create account')
+        setLoading(false)
+        return
+      }
+
       toast.success('Account created successfully! Please sign in.')
       router.push('/login')
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+      setLoading(false)
     }
-  }
-
-  if (!supabase) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    )
   }
 
   return (

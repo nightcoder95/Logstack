@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,30 +9,46 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Lock } from 'lucide-react'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [isValid, setIsValid] = useState(false)
-  const [supabase, setSupabase] = useState<SupabaseClient | null>(null)
+  const [verifying, setVerifying] = useState(true)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
-    const client = createClient()
-    setSupabase(client)
-    
-    // Check if we have a valid session from the reset link
-    client.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setIsValid(true)
-      } else {
-        toast.error('Invalid or expired reset link')
-        router.push('/forgot-password')
-      }
+    const token = searchParams.get('token')
+
+    if (!token) {
+      toast.error('Invalid reset link')
+      router.push('/forgot-password')
+      return
+    }
+
+    // Verify token with API
+    fetch('/api/auth/verify-reset-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
     })
-  }, [router])
+      .then(res => res.json())
+      .then(data => {
+        if (data.valid) {
+          setIsValid(true)
+        } else {
+          toast.error('Invalid or expired reset link')
+          router.push('/forgot-password')
+        }
+      })
+      .catch(() => {
+        toast.error('Failed to verify reset link')
+        router.push('/forgot-password')
+      })
+      .finally(() => setVerifying(false))
+  }, [searchParams, router])
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,26 +72,32 @@ export default function ResetPasswordPage() {
       return
     }
 
-    if (!supabase) {
-      toast.error('Authentication not initialized')
-      setLoading(false)
-      return
-    }
+    const token = searchParams.get('token')
 
-    const { error } = await supabase.auth.updateUser({
-      password: password,
-    })
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      })
 
-    if (error) {
-      toast.error(error.message)
-      setLoading(false)
-    } else {
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.message || 'Failed to reset password')
+        setLoading(false)
+        return
+      }
+
       toast.success('Password updated successfully!')
       router.push('/login')
+    } catch (error) {
+      toast.error('An unexpected error occurred')
+      setLoading(false)
     }
   }
 
-  if (!supabase || !isValid) {
+  if (verifying || !isValid) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
@@ -139,5 +160,13 @@ export default function ResetPasswordPage() {
         </Card>
       </motion.div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }
