@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getLogById, updateLog, softDeleteLog, isValidObjectId } from '@/lib/db/logs'
 import { logSchema } from '@/lib/validation'
-import DOMPurify from 'isomorphic-dompurify'
+import sanitizeHtml from 'sanitize-html'
 
 // GET /api/logs/[id] - Fetch a single log
 export async function GET(
@@ -66,7 +66,11 @@ export async function PATCH(
     const { title, entry_type, date, todos, description, deadline } = result.data
 
     const sanitizedDescription =
-      description !== undefined ? (description ? DOMPurify.sanitize(description) : null) : undefined
+      description !== undefined ? (description ? sanitizeHtml(description, {
+        allowedTags: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre'],
+        allowedAttributes: { a: ['href', 'target', 'rel'] },
+        transformTags: { a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer' }) },
+      }) : null) : undefined
 
     const log = await updateLog(id, session.user.id, {
       title,

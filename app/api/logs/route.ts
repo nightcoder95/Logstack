@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getLogs, createLog, bulkSoftDeleteLogs } from '@/lib/db/logs'
 import { logSchema, bulkDeleteSchema } from '@/lib/validation'
-import DOMPurify from 'isomorphic-dompurify'
+import sanitizeHtml from 'sanitize-html'
 
 // GET /api/logs - Fetch logs with filters
 export async function GET(request: NextRequest) {
@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
 
     const { title, entry_type, date, todos, description, deadline } = result.data
 
-    const sanitizedDescription = description ? DOMPurify.sanitize(description) : null
+    const sanitizedDescription = description ? sanitizeHtml(description, {
+      allowedTags: ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'blockquote', 'code', 'pre'],
+      allowedAttributes: { a: ['href', 'target', 'rel'] },
+      transformTags: { a: sanitizeHtml.simpleTransform('a', { target: '_blank', rel: 'noopener noreferrer' }) },
+    }) : null
 
     const log = await createLog({
       userId: session.user.id,
